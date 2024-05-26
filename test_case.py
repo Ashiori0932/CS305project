@@ -6,12 +6,12 @@ from Header import RDTHeader
 
 proxy_server_address = ('10.16.52.94', 12234)   # ProxyServerAddress
 fromSenderAddr = ('10.16.52.94', 12345)         # FromSender
-toReceiverAddr = ('10.16.52.94', 12346)         # ToSender
+toReceiverAddr = ('10.16.52.94', 12348)         # ToReceiver
 fromReceiverAddr = ('10.16.52.94', 12347)       # FromReceiver
-toSenderAddr = ('10.16.52.94', 12348)           # ToReceiver
+toSenderAddr = ('10.16.52.94', 12346)           # ToSender
 
-sender_address = ("10.16.56.14", 12344)         # Your sender address
-receiver_address = ("10.16.56.14", 12349)       # Your receiver address
+sender_address = ("127.0.0.1", 12344)         # Your sender address
+receiver_address = ("127.0.0.1", 12349)       # Your receiver address
 
 num_test_case = 7
 
@@ -26,6 +26,7 @@ def test_case():
             del reciever_sock
         sender_sock = RDTSocket()   # You can change the initialize RDTSocket()
         reciever_sock = RDTSocket() # You can change the initialize RDTSocket()
+        i = 4
         print(f"Start test case : {i}")
         try:
             RDT_start_test(sender_sock, reciever_sock, sender_address, receiver_address, i)
@@ -34,6 +35,7 @@ def test_case():
         finally:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.sendto(f"{sender_address}-{receiver_address}".encode(), proxy_server_address) #用于清理和关闭对应的proxy连接表
+            break
     
 
 def RDT_start_test(sender_sock, reciever_sock, sender_address, receiver_address, test_case):
@@ -66,7 +68,7 @@ def RDT_send(sender_sock: RDTSocket, source_address, target_address, test_case):
     #############################################################################
     #############################################################################
     # An example to assign proxy server destination
-    sock.proxy_server_addr = ("10.16.52.94", 12345)
+    sock.proxy_server_addr = ("10.16.52.94", 12234)
     #############################################################################
     sock.bind(source_address)
     sock.connect(target_address)
@@ -75,7 +77,8 @@ def RDT_send(sender_sock: RDTSocket, source_address, target_address, test_case):
         try:
             with open(file_path, 'rb') as file:
                 while True:
-                    block = file.read(1024) 
+                    block = file.read(1024)
+                    print("reading...")
                     if not block:
                         break
                     data_blocks.append(block.decode())  
@@ -85,6 +88,7 @@ def RDT_send(sender_sock: RDTSocket, source_address, target_address, test_case):
         except IOError as e:
             print(f"An error occurred: {e}")
         # TODO: it should be modified to sock.send(data = all_data)
+        print("go to send")
         sock.send(data=all_data, test_case=test_case)
     if test_case >= 1 and test_case <= 3:
         data = "Short Message test"
@@ -106,19 +110,25 @@ def RDT_receive(reciever_sock: RDTSocket, source_address, test_case):
     #############################################################################
     #############################################################################
     # An example to assign proxy server destination
-    sock.proxy_server_addr = ("10.16.52.94", 12347)
+    sock.proxy_server_addr = ("10.16.52.94", 12234)
     #############################################################################
     sock.bind(source_address)
     server_sock = sock.accept()
     if test_case >= 1 and test_case <= 3:
         data, _ = server_sock.recv()
     elif test_case > 3:
-        while True:
-            data, _ = server_sock.recv()
-            #############################################################################
-            # TODO: Save all data to the file, and stop this loop when the client
-            #       close the connection.
-            break
+        with open('transmit.txt', 'wb') as f:
+            while True:
+                data, _ = server_sock.recv()
+                #############################################################################
+                # TODO: Save all data to the file, and stop this loop when the client
+                #       close the connection.
+                if not data:  # Assuming the client closes the connection when no more data is sent.
+                    break
+                print("write data:")
+                print(data)
+                f.write(data)
+                break
             #############################################################################
         #############################################################################
         # TODO: You could use the following function to verify the file that you received.
@@ -126,6 +136,8 @@ def RDT_receive(reciever_sock: RDTSocket, source_address, test_case):
         #               to transmit.txt
         if test_file_integrity('original.txt', 'transmit.txt'):
             print("These two files are same. Verified passed.")
+        else:
+            print("Contents is different!!!")
         #############################################################################
         
 
@@ -136,7 +148,8 @@ def test_file_integrity(original_path, transmit_path):
             block2 = file2.read(4096)
             
             if block1 != block2:
-                raise Exception("Contents is different")
+                # raise Exception("Contents is different")
+                return False
             
             if not block1:
                 break
