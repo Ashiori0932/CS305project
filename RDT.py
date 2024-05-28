@@ -6,6 +6,9 @@ from Header import RDTHeader
 import random
 import time
 
+fromReceiverAddr = ('10.16.52.94', 12347)
+fromSenderAddr = ('10.16.52.94', 12345)
+
 
 class RDTSocket():
     def __init__(self) -> None:
@@ -26,17 +29,18 @@ class RDTSocket():
         self.ack_num = 0  # 最新确认的序列号
         self.cwnd = 1024
         self.rwnd = 1024
-        self.timeout = 1.0  # 超时时间(秒)
+        self.timeout = 5.0  # 超时时间(秒)
         # self.local_addr = self.socket.getsockname()
         self.remote_addr = None
+        self.my_address =('0.0.0.0',0)
         #############################################################################
-        
+
         #############################################################################
         # TODO: YOUR CODE HERE                                                      #
         #############################################################################
         pass
-    
-    def bind(self, address: (str, int)): # type: ignore
+
+    def bind(self, address: (str, int)):  # type: ignore
         """
         When trying to establish a connection. The socket must be bound to an address 
         and listening for connections. address is the address bound to the socket on 
@@ -54,14 +58,14 @@ class RDTSocket():
         try:
             self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
             self.socket.bind(address)
-            print("Socket bound successfully.")
+            print("Socket bound successfully.", address)
         except OSError as e:
             print("Error binding socket:", str(e))
         #############################################################################
-        #raise NotImplementedError()
+        # raise NotImplementedError()
 
     # 服务器accept
-    def accept(self): #-> RDTSocket: # type: ignore
+    def accept(self):  # -> RDTSocket: # type: ignore
         """
         When using this SOCKET to create an RDT SERVER, it should accept the connection
         from a CLIENT. After that, an RDT connection should be established.
@@ -78,7 +82,7 @@ class RDTSocket():
         return RDTSocket(client_socket)"""
         # 接收连接请求
         data, addr = self.socket.recvfrom(1024)
-        header = RDTHeader().from_bytes(data) # 将解析后的数据存储在header对象中
+        header = RDTHeader().from_bytes(data)  # 将解析后的数据存储在header对象中
         print("作为服务器，接收第一次握手")
         self.lock = threading.Lock()
         # 如果是SYN请求, 三次握手
@@ -89,23 +93,28 @@ class RDTSocket():
                 conn = RDTSocket()
                 # conn.lock = threading.Lock()
                 conn_port = 12021
-                conn.bind(("127.0.0.1", conn_port))
+                conn.bind(("10.13.217.157", conn_port))
                 conn.seq_num = random.randint(0, 2 ** 32 - 1)
                 conn.ack_num = header.SEQ_num + 1
+                conn.my_address = ("10.13.217.157", conn_port)
                 # with self.lock:
                 self.connections[addr] = conn
-                #conn.server_addr = addr
+                # conn.server_addr = addr
 
             # 发送SYN-ACK响应
             syn_ack_header = RDTHeader(SYN=1, ACK=1, SEQ_num=conn.seq_num, ACK_num=conn.ack_num)
+            syn_ack_header.Source_address = [10, 13, 217, 157, 12021]
+            syn_ack_header.Target_address = [10, 13, 217, 157, 12334]
+            # print("尝试发送给代理服务器:", fromReceiverAddr)
+            # conn.socket.sendto(syn_ack_header.to_bytes(), fromReceiverAddr)
             conn.socket.sendto(syn_ack_header.to_bytes(), addr)
             print("作为服务器，发送第二次握手")
             # 等待ACK
             data, addr = conn.socket.recvfrom(1024)
-            header = RDTHeader().from_bytes(data) # 将解析后的数据存储在header对象中
+            header = RDTHeader().from_bytes(data)  # 将解析后的数据存储在header对象中
             print("作为服务器，接收第三次握手")
             # 如果收到ACK
-            if header.ACK == 1  and header.ACK_num == conn.seq_num + 1:
+            if header.ACK == 1 and header.ACK_num == conn.seq_num + 1:
                 # 连接建立成功
                 conn.connected = True
                 print("作为服务器，建立连接成功")
@@ -113,10 +122,10 @@ class RDTSocket():
 
         raise Exception("无法建立连接")
         #############################################################################
-        #raise NotImplementedError()
+        # raise NotImplementedError()
 
     # 客户端发起connect
-    def connect(self, address: (str, int)): # type: ignore
+    def connect(self, address: (str, int)):  # type: ignore
         """
         When using this SOCKET to create an RDT client, it should send the connection
         request to target SERVER. After that, an RDT connection should be established.
@@ -128,24 +137,41 @@ class RDTSocket():
         # TODO: YOUR CODE HERE                                                      #
         try:
             # 实现三次握手
-            #syn_packet = RDTHeader(syn=1)
-            #self.socket.sendto(syn_packet.to_bytes(), address)
+            # syn_packet = RDTHeader(syn=1)
+            # self.socket.sendto(syn_packet.to_bytes(), address)
 
             # 第一次握手：客户端发送SYN请求
             self.seq_num = random.randint(0, 2 ** 32 - 1)
             syn_header = RDTHeader(SYN=1, SEQ_num=self.seq_num)
+            syn_header.Source_address = [10, 13, 217, 157, 12334]
+            syn_header.Target_address = [10, 13, 217, 157, 12335]
+            # syn_header.Target_address = [10,16,52,94,12345]
+            # 10.16.52.94:12345
+            print("发送的第一次握手报文：")
+            self.print_header(syn_header)
+            # print("尝试发送给代理服务器:", fromSenderAddr)
+            # self.socket.sendto(syn_header.to_bytes(), fromSenderAddr)
             self.socket.sendto(syn_header.to_bytes(), address)
             print("作为客户端，发送第一次握手")
 
             data, server_addr = self.socket.recvfrom(1024)
-            syn_ack_packet = RDTHeader().from_bytes(data) # 将解析后的数据存储在syn_ack_packet对象中
+            syn_ack_packet = RDTHeader().from_bytes(data)  # 将解析后的数据存储在
+
             print("作为客户端，接收第二次握手")
+            print("接收的第二次握手报文：")
+            self.print_header(syn_ack_packet)
             if syn_ack_packet.SYN == 1 and syn_ack_packet.ACK == 1 and syn_ack_packet.ACK_num == self.seq_num + 1:
                 self.ack_num = syn_ack_packet.SEQ_num + 1
                 self.server_addr = server_addr
                 self.connections[server_addr] = self
                 # 第三次握手：发送ACK确认
                 ack_packet = RDTHeader(ACK=1, ACK_num=syn_ack_packet.SEQ_num + 1)
+                ack_packet.Source_address = [10, 13, 217, 157, 12334]
+                ack_packet.Target_address = [10, 13, 217, 157, 12021]
+                print("发送的第三次握手报文：")
+                self.print_header(ack_packet)
+                # print("尝试发送给代理服务器:", fromSenderAddr)
+                # self.socket.sendto(ack_packet.to_bytes(), fromSenderAddr)
                 self.socket.sendto(ack_packet.to_bytes(), server_addr)
                 print("作为客户端，发送第三次握手")
                 self.connected = True
@@ -156,8 +182,8 @@ class RDTSocket():
         except Exception as e:
             print("连接过程中出现异常:", str(e))
         #############################################################################
-        #raise NotImplementedError()
-    
+        # raise NotImplementedError()
+
     def send(self, data=None, tcpheader=None, test_case=0):
         """
         RDT can use this function to send specified data to a target that has already 
@@ -179,11 +205,10 @@ class RDTSocket():
         if not self.connected:
             raise ValueError("Socket is not connected")
 
-
         # 获取目标地址
-        #target_addr = list(self.connections.keys())[0]
+        # target_addr = list(self.connections.keys())[0]
         target_addr = self.server_addr
-        print("target pass")
+        # print("target pass")
         # 如果数据为空,发送tcpheader
         if data is None:
             checksum = 0
@@ -197,11 +222,16 @@ class RDTSocket():
         else:
             # 分段并发送数据
             data = data.encode() if isinstance(data, str) else "".encode()
+            total_len = len(data)
             while data:
                 chunk = data[:256]  # 最大256字节的数据块
                 data = data[256:]
+                print("剩余data长度",len(data))
                 # 计算checksum
-                packet = RDTHeader(SEQ_num=self.seq_num, ACK_num=self.ack_num, LEN=len(chunk), CHECKSUM=0, PAYLOAD=chunk.decode(), RWND=self.rwnd)
+                packet = RDTHeader(SEQ_num=self.seq_num, ACK_num=self.ack_num, LEN=total_len, CHECKSUM=0,
+                                   PAYLOAD=chunk.decode(errors='ignore'), RWND=self.rwnd)
+                packet.Source_address = [10, 13, 217, 157, 12334]
+                packet.Target_address = [10, 13, 217, 157, 12021]
                 checksum = self.cal_checksum(packet.to_bytes())
                 print("已计算checksum")
                 packet.CHECKSUM = checksum
@@ -210,58 +240,51 @@ class RDTSocket():
                 # packet.Target_address =[10,16,52,94,12345]
                 self.send_buffer[self.seq_num] = (packet, time.time())
 
+                print()
                 print("要发送的包：")
-                print(packet.test_case)
-                print(packet.Source_address)
-                print(packet.Target_address)
-                print(packet.SYN)
-                print(packet.FIN)
-                print(packet.ACK)
-                print(packet.SEQ_num)
-                print(packet.ACK_num)
-                print(packet.LEN)
-                print(packet.CHECKSUM)
-                print(packet.RWND)
-                print(packet.Reserved)
-                print(packet.PAYLOAD)
-                print(packet.to_bytes())
+                self.print_header(packet)
 
-                self.socket.sendto(packet.to_bytes(), target_addr)
+                print("尝试发送给代理服务器:", fromSenderAddr)
+                self.socket.sendto(packet.to_bytes(), fromSenderAddr)
+                # self.socket.sendto(packet.to_bytes(), target_addr)
                 # print("经过代理服务器")
                 # self.socket.sendto(packet.to_bytes(), ('10.16.52.94', 12345))
-                self.seq_num = (self.seq_num + len(chunk) )% (2 ** 32)
+                self.seq_num = (self.seq_num + len(chunk)) % (2 ** 32)
                 print("已发送一块数据")
+                time.sleep(5)
 
         # 等待ACK并重传未确认的数据包
-        while self.send_buffer:
-            self.handle_timeout()
-            try:
-                data, addr = self.socket.recvfrom(1024)
-                print("已接收到ACK数据包\n")
-                ack_packet = RDTHeader().from_bytes(data)
-                # if not (ack_packet.ACK == 1 and ack_packet.ACK_num == (self.seq_num + 1) % (2 ** 32)):
-                # if False:
-                print(ack_packet.ACK_num)
-                print(self.seq_num % (2 ** 32))
-                if not (ack_packet.ACK == 1 and ack_packet.ACK_num == self.seq_num % (2 ** 32)):
-                    print("需要重传")
-                    self.handle_ack(ack_packet.ACK_num)
-                    print(ack_packet.ACK_num)
-                    self.socket.sendto(self.send_buffer[ack_packet.ACK_num][0].to_bytes(), target_addr)
-                    print("已重传")
-                else:
-                    print(self.send_buffer)
-                    self.send_buffer.pop(ack_packet.ACK_num-packet.LEN)
-                    # 清楚收到的缓冲
-            except BlockingIOError:
-                continue
-            if len(self.send_buffer) == 0:
-                print("已重传完毕")
-                break
-        #self.ack_num = header.SEQ_num + 1
+                while self.send_buffer:
+                    self.handle_timeout()
+                    try:
+                        ack_data, addr = self.socket.recvfrom(1024)
+                        print("已接收到ACK数据包")
+                        ack_packet = RDTHeader().from_bytes(ack_data)
+                        # if not (ack_packet.ACK == 1 and ack_packet.ACK_num == (self.seq_num + 1) % (2 ** 32)):
+                        # if False:
+                        print(ack_packet.ACK_num)
+                        print(self.seq_num % (2 ** 32))
+                        if not (ack_packet.ACK == 1 and ack_packet.ACK_num == self.seq_num % (2 ** 32)) and False:
+                            print("需要重传")
+                            self.handle_ack(ack_packet.ACK_num)
+                            print(ack_packet.ACK_num)
+                            self.socket.sendto(self.send_buffer[ack_packet.ACK_num][0].to_bytes(), target_addr)
+                            print("已重传")
+                        else:
+                            # print(self.send_buffer)
+                            for part in self.send_buffer:
+                                print("send_buffer part:",part)
+                            self.send_buffer.pop(ack_packet.ACK_num - packet.LEN)
+                            # 清除收到的缓冲
+                    except BlockingIOError:
+                        continue
+                    if len(self.send_buffer) == 0:
+                        print("已无需重传")
+                        break
+        # self.ack_num = header.SEQ_num + 1
         #############################################################################
-        #raise NotImplementedError()
-    
+        # raise NotImplementedError()
+
     def recv(self):
         """
         You should implement the basic logic for receiving data in this function, and 
@@ -280,26 +303,15 @@ class RDTSocket():
             while True:
                 try:
                     # 接收数据包
+                    print("waiting at:", self.my_address)
                     data, addr = self.socket.recvfrom(1024)
                     print("已接收数据包")
-                    print(data)
+                    # print(data)
                     if data:
                         header = RDTHeader().from_bytes(data)
 
                         print("接受到的包：")
-                        print(header.test_case)
-                        print(header.Source_address)
-                        print(header.Target_address)
-                        print(header.SYN)
-                        print(header.FIN)
-                        print(header.ACK)
-                        print(header.SEQ_num)
-                        print(header.ACK_num)
-                        print(header.LEN)
-                        print(header.CHECKSUM)
-                        print(header.RWND)
-                        print(header.Reserved)
-                        print(header.PAYLOAD)
+                        self.print_header(header)
 
                         # header_checksum = header.CHECKSUM
                         # 检查校验和
@@ -317,7 +329,13 @@ class RDTSocket():
                             print("checksum正确")
                             # 发送ACK响应
                             ack_header = RDTHeader(ACK=1, SEQ_num=self.seq_num, ACK_num=header.SEQ_num + payload_len)
-                            self.socket.sendto(ack_header.to_bytes(), addr)
+gi                            ack_header.Source_address = [10, 13, 217, 157, 12021]
+                            ack_header.Target_address = [10, 13, 217, 157, 12334]
+                            print("发送的ACK响应：")
+                            self.print_header(ack_header)
+                            print("尝试发送给代理服务器:", fromReceiverAddr)
+                            self.socket.sendto(ack_header.to_bytes(), fromReceiverAddr)
+                            # self.socket.sendto(ack_header.to_bytes(), addr)
                             print("已发送ACK响应")
                             # 更新确认号和序列号
                             self.ack_num = header.SEQ_num + payload_len
@@ -347,14 +365,14 @@ class RDTSocket():
             ordered_data = b''
             for seq_num in sorted(self.recv_buffer.keys()):
                 ordered_data += self.recv_buffer.pop(seq_num)
-            print(ordered_data.decode())
+            # print(ordered_data.decode())
             # print(self.recv_buffer)
             # 按SEQ_num顺序拼接数据
             # data = b''.join(chunk for _, chunk in sorted(recv_buffer.items()))
-            print("receiver out\n")
+            # print("receiver out\n")
             return ordered_data, addr
             # 返回数据负载
-            #return payload.decode()
+            # return payload.decode()
             """else:
                 # 发送NAK响应,丢弃该数据包,请求重传
                 nak_header = RDTHeader(ACK=0, SEQ_num=self.seq_num, ACK_num=header.SEQ_num)
@@ -364,9 +382,8 @@ class RDTSocket():
             #self.ack_num = header.SEQ_num + len(header.PAYLOAD)
             return header.PAYLOAD"""
         ##############################################
-        #raise NotImplementedError()
-    
-    
+        # raise NotImplementedError()
+
     def close(self):
         """
         Close current RDT connection.
@@ -378,13 +395,13 @@ class RDTSocket():
         self.connected = False
         self.socket.close()
         #############################################################################
-        #raise NotImplementedError()
+        # raise NotImplementedError()
 
     def cal_checksum(self, data):
-        #计算数据包的校验和
+        # 计算数据包的校验和
         # 1.将校验和字段先设置为0
         checksum = 0
-        data =data[0:32]+b"\x00"+data[34:]
+        data = data[0:32] + b"\x00" + data[34:]
         data = data[1:]
         # 2.将数据划分为16位(2字节)的段
         segments = []
@@ -410,14 +427,35 @@ class RDTSocket():
 
     def handle_timeout(self):
         # 超时重传
-        # print("进入超时重传\n")
-        current_time = time.time()
-        for seq_num, (packet, send_time) in list(self.send_buffer.items()):
-            if current_time - send_time > self.timeout:
-                # 超时,重传数据包
-                self.socket.sendto(packet.to_bytes(), self.server_addr)
-                self.send_buffer[seq_num] = (packet, current_time)  # 更新发送时间
-                print("已处理超时重传")
+        print("已处理超时重传")
+        # current_time = time.time()
+        # for seq_num, (packet, send_time) in list(self.send_buffer.items()):
+        #     if current_time - send_time > self.timeout:
+        #         # 超时,重传数据包
+        #         self.socket.sendto(packet.to_bytes(), self.server_addr)
+        #         self.send_buffer[seq_num] = (packet, current_time)  # 更新发送时间
+        #         print("已处理超时重传")
+
+    def print_header(self, header: RDTHeader):
+
+        print()
+        print(header.test_case)
+        print(header.Source_address)
+        print(header.Target_address)
+        print(header.SYN)
+        print(header.FIN)
+        print(header.ACK)
+        print(header.SEQ_num)
+        print(header.ACK_num)
+        print(header.LEN)
+        print(header.CHECKSUM)
+        print(header.RWND)
+        print(header.Reserved)
+        if header.PAYLOAD == "":
+            print("PAYLOAD为空")
+        else:
+            print(header.PAYLOAD)
+        print()
 
     def handle_ack(self, ack_num):
         # 处理接收的ACK

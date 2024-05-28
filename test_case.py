@@ -10,8 +10,11 @@ toReceiverAddr = ('10.16.52.94', 12348)         # ToReceiver
 fromReceiverAddr = ('10.16.52.94', 12347)       # FromReceiver
 toSenderAddr = ('10.16.52.94', 12346)           # ToSender
 
-sender_address = ("127.0.0.1", 12344)         # Your sender address
-receiver_address = ("127.0.0.1", 12349)       # Your receiver address
+# sender_address = ("127.0.0.1", 12344)         # Your sender address
+# receiver_address = ("127.0.0.1", 12349)       # Your receiver address
+
+sender_address = ("10.13.217.157", 12334)
+receiver_address = ("10.13.217.157", 12335)
 
 num_test_case = 7
 
@@ -26,7 +29,7 @@ def test_case():
             del reciever_sock
         sender_sock = RDTSocket()   # You can change the initialize RDTSocket()
         reciever_sock = RDTSocket() # You can change the initialize RDTSocket()
-        i = 4
+        # i = 1
         print(f"Start test case : {i}")
         try:
             RDT_start_test(sender_sock, reciever_sock, sender_address, receiver_address, i)
@@ -35,7 +38,7 @@ def test_case():
         finally:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.sendto(f"{sender_address}-{receiver_address}".encode(), proxy_server_address) #用于清理和关闭对应的proxy连接表
-            break
+            # break
     
 
 def RDT_start_test(sender_sock, reciever_sock, sender_address, receiver_address, test_case):
@@ -68,11 +71,11 @@ def RDT_send(sender_sock: RDTSocket, source_address, target_address, test_case):
     #############################################################################
     #############################################################################
     # An example to assign proxy server destination
-    sock.proxy_server_addr = ("10.16.52.94", 12234)
+    # sock.proxy_server_addr = ("10.16.52.94", 12234)
     #############################################################################
     sock.bind(source_address)
     sock.connect(target_address)
-    time.sleep(1)
+    time.sleep(5)
     if test_case > 3:
         try:
             with open(file_path, 'rb') as file:
@@ -125,8 +128,8 @@ def RDT_receive(reciever_sock: RDTSocket, source_address, test_case):
                 #       close the connection.
                 if not data:  # Assuming the client closes the connection when no more data is sent.
                     break
-                print("write data:")
-                print(data)
+                # print("write data:")
+                # print(data)
                 f.write(data)
                 break
             #############################################################################
