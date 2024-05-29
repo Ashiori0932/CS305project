@@ -93,18 +93,18 @@ class RDTSocket():
                 conn = RDTSocket()
                 # conn.lock = threading.Lock()
                 conn_port = 12021
-                conn.bind(("10.13.217.157", conn_port))
+                conn.bind(("10.26.97.249", conn_port))
                 conn.seq_num = random.randint(0, 2 ** 32 - 1)
                 conn.ack_num = header.SEQ_num + 1
-                conn.my_address = ("10.13.217.157", conn_port)
+                conn.my_address = ("10.26.97.249", conn_port)
                 # with self.lock:
                 self.connections[addr] = conn
                 # conn.server_addr = addr
 
             # 发送SYN-ACK响应
             syn_ack_header = RDTHeader(SYN=1, ACK=1, SEQ_num=conn.seq_num, ACK_num=conn.ack_num)
-            syn_ack_header.Source_address = [10, 13, 217, 157, 12021]
-            syn_ack_header.Target_address = [10, 13, 217, 157, 12334]
+            syn_ack_header.Source_address = [10, 26, 97, 249, 12021]
+            syn_ack_header.Target_address = [10, 26, 97, 249, 12334]
             # print("尝试发送给代理服务器:", fromReceiverAddr)
             # conn.socket.sendto(syn_ack_header.to_bytes(), fromReceiverAddr)
             conn.socket.sendto(syn_ack_header.to_bytes(), addr)
@@ -143,8 +143,8 @@ class RDTSocket():
             # 第一次握手：客户端发送SYN请求
             self.seq_num = random.randint(0, 2 ** 32 - 1)
             syn_header = RDTHeader(SYN=1, SEQ_num=self.seq_num)
-            syn_header.Source_address = [10, 13, 217, 157, 12334]
-            syn_header.Target_address = [10, 13, 217, 157, 12335]
+            syn_header.Source_address = [10, 26, 97, 249, 12334]
+            syn_header.Target_address = [10, 26, 97, 249, 12335]
             # syn_header.Target_address = [10,16,52,94,12345]
             # 10.16.52.94:12345
             print("发送的第一次握手报文：")
@@ -166,8 +166,8 @@ class RDTSocket():
                 self.connections[server_addr] = self
                 # 第三次握手：发送ACK确认
                 ack_packet = RDTHeader(ACK=1, ACK_num=syn_ack_packet.SEQ_num + 1)
-                ack_packet.Source_address = [10, 13, 217, 157, 12334]
-                ack_packet.Target_address = [10, 13, 217, 157, 12021]
+                ack_packet.Source_address = [10, 26, 97, 249, 12334]
+                ack_packet.Target_address = [10, 26, 97, 249, 12021]
                 print("发送的第三次握手报文：")
                 self.print_header(ack_packet)
                 # print("尝试发送给代理服务器:", fromSenderAddr)
@@ -230,8 +230,8 @@ class RDTSocket():
                 # 计算checksum
                 packet = RDTHeader(SEQ_num=self.seq_num, ACK_num=self.ack_num, LEN=total_len, CHECKSUM=0,
                                    PAYLOAD=chunk.decode(errors='ignore'), RWND=self.rwnd)
-                packet.Source_address = [10, 13, 217, 157, 12334]
-                packet.Target_address = [10, 13, 217, 157, 12021]
+                packet.Source_address = [10, 26, 97, 249, 12334]
+                packet.Target_address = [10, 26, 97, 249, 12021]
                 checksum = self.cal_checksum(packet.to_bytes())
                 print("已计算checksum")
                 packet.CHECKSUM = checksum
@@ -329,8 +329,8 @@ class RDTSocket():
                             print("checksum正确")
                             # 发送ACK响应
                             ack_header = RDTHeader(ACK=1, SEQ_num=self.seq_num, ACK_num=header.SEQ_num + payload_len)
-gi                            ack_header.Source_address = [10, 13, 217, 157, 12021]
-                            ack_header.Target_address = [10, 13, 217, 157, 12334]
+                            ack_header.Source_address = [10, 26, 97, 249, 12021]
+                            ack_header.Target_address = [10, 26, 97, 249, 12334]
                             print("发送的ACK响应：")
                             self.print_header(ack_header)
                             print("尝试发送给代理服务器:", fromReceiverAddr)

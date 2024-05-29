@@ -13,8 +13,8 @@ toSenderAddr = ('10.16.52.94', 12346)           # ToSender
 # sender_address = ("127.0.0.1", 12344)         # Your sender address
 # receiver_address = ("127.0.0.1", 12349)       # Your receiver address
 
-sender_address = ("10.13.217.157", 12334)
-receiver_address = ("10.13.217.157", 12335)
+sender_address = ("10.26.97.249", 12334)
+receiver_address = ("10.26.97.249", 12335)
 
 num_test_case = 7
 
