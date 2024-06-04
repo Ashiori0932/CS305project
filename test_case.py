@@ -113,7 +113,9 @@ def RDT_receive(reciever_sock: RDTSocket, source_address, test_case):
     sock.proxy_server_addr = ("10.16.52.94", 12234)
     #############################################################################
     sock.bind(source_address)
+
     server_sock = sock.accept()
+    # print(",,,,,")
     if test_case >= 1 and test_case <= 3:
         data, _ = server_sock.recv()
     elif test_case > 3:
