@@ -323,10 +323,54 @@ class RDTSocket():
         You should follow the 4-way-handshake, and then the RDT connection will be terminated.
         """
         #############################################################################
-        self.socket = socket(AF_INET, SOCK_DGRAM)
-        self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        #self.socket = socket(AF_INET, SOCK_DGRAM)
+        #self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         # print(self.address)
-        self.socket.bind(self.address)                                      #
+        #self.socket.bind(self.address)                                      #
+            try:
+            # 第一次挥手：发送FIN包
+            fin_header = RDTHeader(FIN=1, SEQ_num=self.seq_num)
+            fin_header.Source_address = self.tuple_to_list(self.address)
+            fin_header.Target_address = self.tuple_to_list(self.target_address)
+            fin_header.test_case = 21  # 假设用于测试的特定案例
+            print("客户端发送FIN包开始关闭连接")
+            self.print_header(fin_header)
+            self.socket.sendto(fin_header.to_bytes(), self.proxy_server_addr)
+
+            # 第二次挥手：接收ACK
+            print("客户端等待ACK响应")
+            ack_data, _ = self.socket.recvfrom(1024)
+            ack_header = RDTHeader().from_bytes(ack_data)
+            if ack_header.ACK == 1 and ack_header.ACK_num == self.seq_num + 1:
+                print("收到对FIN的确认ACK")
+
+                # 第三次挥手：接收对方的FIN
+                print("客户端等待对方的FIN包")
+                fin_data, _ = self.socket.recvfrom(1024)
+                fin_ack_header = RDTHeader().from_bytes(fin_data)
+                if fin_ack_header.FIN == 1:
+                    self.ack_num = fin_ack_header.SEQ_num + 1
+                    print("收到对方的FIN包")
+
+                    # 第四次挥手：发送最后一个ACK
+                    final_ack_header = RDTHeader(ACK=1, ACK_num=self.ack_num)
+                    final_ack_header.Source_address = self.tuple_to_list(self.address)
+                    final_ack_header.Target_address = self.tuple_to_list(self.target_address)
+                    final_ack_header.test_case = 21
+                    print("发送最后一个ACK确认")
+                    self.print_header(final_ack_header)
+                    self.socket.sendto(final_ack_header.to_bytes(), self.proxy_server_addr)
+                    print("四次挥手完成，连接关闭")
+            else:
+                print("未收到有效的ACK响应，挥手失败")
+
+        except Exception as e:
+            print(f"关闭连接时发生异常: {e}")
+            raise e
+        finally:
+            # 关闭套接字
+            self.socket.close()
+            print("套接字已关闭")
         #############################################################################
         # raise NotImplementedError()
 
