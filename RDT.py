@@ -137,6 +137,22 @@ class RDTSocket():
             self.socket.sendto(syn_header.to_bytes(), address)
             print("作为客户端，发送第一次握手")
 
+            print("要发送的包：")
+            print(syn_header.test_case)
+            print(syn_header.Source_address)
+            print(syn_header.Target_address)
+            print(syn_header.SYN)
+            print(syn_header.FIN)
+            print(syn_header.ACK)
+            print(syn_header.SEQ_num)
+            print(syn_header.ACK_num)
+            print(syn_header.LEN)
+            print(syn_header.CHECKSUM)
+            print(syn_header.RWND)
+            print(syn_header.Reserved)
+            print(syn_header.PAYLOAD)
+            print(syn_header.to_bytes())
+
             data, server_addr = self.socket.recvfrom(1024)
             syn_ack_packet = RDTHeader().from_bytes(data) # 将解析后的数据存储在syn_ack_packet对象中
             print("作为客户端，接收第二次握手")
@@ -148,6 +164,21 @@ class RDTSocket():
                 ack_packet = RDTHeader(ACK=1, ACK_num=syn_ack_packet.SEQ_num + 1)
                 self.socket.sendto(ack_packet.to_bytes(), server_addr)
                 print("作为客户端，发送第三次握手")
+                print("要发送的包：")
+                print(ack_packet.test_case)
+                print(syn_header.Source_address)
+                print(syn_header.Target_address)
+                print(syn_header.SYN)
+                print(syn_header.FIN)
+                print(syn_header.ACK)
+                print(syn_header.SEQ_num)
+                print(syn_header.ACK_num)
+                print(syn_header.LEN)
+                print(syn_header.CHECKSUM)
+                print(syn_header.RWND)
+                print(syn_header.Reserved)
+                print(syn_header.PAYLOAD)
+                print(syn_header.to_bytes())
                 self.connected = True
                 print("作为客户端，建立连接成功")
             else:
@@ -197,11 +228,12 @@ class RDTSocket():
         else:
             # 分段并发送数据
             data = data.encode() if isinstance(data, str) else "".encode()
+            len_data = len(data)
             while data:
                 chunk = data[:256]  # 最大256字节的数据块
                 data = data[256:]
                 # 计算checksum
-                packet = RDTHeader(SEQ_num=self.seq_num, ACK_num=self.ack_num, LEN=len(chunk), CHECKSUM=0, PAYLOAD=chunk.decode(), RWND=self.rwnd)
+                packet = RDTHeader(SEQ_num=self.seq_num, ACK_num=self.ack_num, LEN=len_data, CHECKSUM=0, PAYLOAD=chunk.decode(), RWND=self.rwnd)
                 checksum = self.cal_checksum(packet.to_bytes())
                 print("已计算checksum")
                 packet.CHECKSUM = checksum
@@ -234,6 +266,7 @@ class RDTSocket():
 
         # 等待ACK并重传未确认的数据包
         while self.send_buffer:
+            break
             self.handle_timeout()
             try:
                 data, addr = self.socket.recvfrom(1024)
@@ -367,18 +400,18 @@ class RDTSocket():
         #raise NotImplementedError()
     
     
-    def close(self):
-        """
-        Close current RDT connection.
-        You should follow the 4-way-handshake, and then the RDT connection will be terminated.
-        """
-        #############################################################################
-        # TODO: YOUR CODE HERE                                                      #
-        # 四次挥手
-        self.connected = False
-        self.socket.close()
-        #############################################################################
-        #raise NotImplementedError()
+    # def close(self):
+    #     """
+    #     Close current RDT connection.
+    #     You should follow the 4-way-handshake, and then the RDT connection will be terminated.
+    #     """
+    #     #############################################################################
+    #     # TODO: YOUR CODE HERE                                                      #
+    #     # 四次挥手
+    #     self.connected = False
+    #     self.socket.close()
+    #     #############################################################################
+    #     #raise NotImplementedError()
 
     def cal_checksum(self, data):
         #计算数据包的校验和
@@ -436,3 +469,116 @@ class RDTSocket():
         if acked_packets:
             self.ack_num = max(self.ack_num, max(acked_packets) + 1)
         print("已处理接收的ACK")
+
+    def close(self):
+        """
+        Close current RDT connection.
+        You should follow the 4-way-handshake, and then the RDT connection will be terminated.
+        """
+        try:
+            # 第一次挥手：发送FIN包
+            fin_header = RDTHeader(FIN=1, SEQ_num=self.seq_num)
+            fin_header.test_case = 21  # 假设用于测试的特定案例
+            print("客户端发送FIN包开始关闭连接")
+            # self.print_header(fin_header)
+            self.socket.sendto(fin_header.to_bytes(), self.proxy_server_addr)
+
+            # 第二次挥手：接收ACK
+            while True:
+                print("客户端等待ACK响应")
+                self.socket.settimeout(10)  # 设置超时为10秒
+                try:
+                    ack_data, _ = self.socket.recvfrom(1024)
+                    ack_header = RDTHeader().from_bytes(ack_data)
+                    print("收到ACK包：", ack_data)
+                    if ack_header.ACK == 1 and ack_header.ACK_num == self.seq_num + 1:
+                        print("收到对FIN的确认ACK")
+
+                        # 第三次挥手：接收对方的FIN
+                        print("客户端等待对方的FIN包")
+                        fin_data, _ = self.socket.recvfrom(1024)
+                        fin_ack_header = RDTHeader().from_bytes(fin_data)
+                        print("收到FIN包：", fin_data)
+                        if fin_ack_header.FIN == 1:
+                            self.ack_num = fin_ack_header.SEQ_num + 1
+                            print("收到对方的FIN包")
+
+                            # 第四次挥手：发送最后一个ACK
+                            final_ack_header = RDTHeader(ACK=1, ACK_num=self.ack_num)
+                            final_ack_header.test_case = 21
+                            print("发送最后一个ACK确认")
+                            # self.print_header(final_ack_header)
+                            self.socket.sendto(final_ack_header.to_bytes(), self.proxy_server_addr)
+                            print("四次挥手完成，连接关闭")
+                            break
+                    else:
+                        print("未收到有效的ACK响应，挥手失败")
+                        break
+                except Exception as e:
+                    print(f"Error in close: {e}")
+                    print("等待ACK响应超时，重传FIN包")
+                    self.socket.sendto(fin_header.to_bytes(), self.proxy_server_addr)
+
+        except Exception as e:
+            print(f"关闭连接时发生异常: {e}")
+            raise e
+        finally:
+            # 关闭套接字
+            self.socket.close()
+            print("套接字已关闭")
+
+    def close_server(self):
+        """
+        Close current RDT connection.
+        You should follow the 4-way-handshake, and then the RDT connection will be terminated.
+        """
+        try:
+            while True:
+                try:
+                    # 接收客户端的FIN包
+                    print("服务端等待客户端的FIN包")
+                    fin_data, client_address = self.socket.recvfrom(1024)
+                    print("收到FIN包：", fin_data)
+                    fin_header = RDTHeader().from_bytes(fin_data)
+                    print("收到FIN包：", fin_data)
+                    if fin_header.FIN == 1:
+                        self.ack_num = fin_header.SEQ_num + 1
+
+                        # 第二次挥手：发送ACK确认
+                        ack_header = RDTHeader(ACK=1, ACK_num=self.ack_num)
+                        print("发送ACK包确认客户端的FIN")
+                        self.print_header(ack_header)
+                        self.socket.sendto(ack_header.to_bytes(), self.proxy_server_addr)
+
+                        # 日志记录
+                        print("服务端发送ACK包：", ack_header.to_bytes())
+
+                        # 第三次挥手：发送FIN包
+                        fin_ack_header = RDTHeader(FIN=1, SEQ_num=self.seq_num)
+                        print("服务端发送FIN包")
+                        self.print_header(fin_ack_header)
+                        self.socket.sendto(fin_ack_header.to_bytes(), self.proxy_server_addr)
+
+                        # 第四次挥手：接收客户端的ACK
+                        self.socket.settimeout(10)  # 设置超时为10秒
+                        try:
+                            final_ack_data, _ = self.socket.recvfrom(1024)
+                            final_ack_header = RDTHeader().from_bytes(final_ack_data)
+                            if final_ack_header.ACK == 1 and final_ack_header.ACK_num == self.seq_num + 1:
+                                print("收到客户端的最后一个ACK，连接关闭")
+                                break
+                        except Exception as e:
+                            print("等待最后一个ACK响应超时，连接关闭失败")
+                            break
+                    else:
+                        print("收到无效的FIN包，继续等待")
+                except Exception as e:
+                    print("等待客户端的FIN包超时，重试")
+                    break
+        except Exception as e:
+            print(f"关闭连接时发生异常: {e}")
+            raise e
+        finally:
+            # 关闭套接字
+            self.socket.close()
+            print("套接字已关闭")

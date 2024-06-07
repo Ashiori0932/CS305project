@@ -1,4 +1,5 @@
 import socket
+import threading
 import time
 from RDT import RDTSocket
 from multiprocessing import Process
@@ -50,6 +51,16 @@ def RDT_start_test(sender_sock, reciever_sock, sender_address, receiver_address,
     receiver.join()
     time.sleep(5)
 
+    send_close = threading.Thread(target=close_send, args=(sender_sock,))
+    receiver_close = threading.Thread(target=close_server, args=(reciever_sock,))
+
+    send_close.start()
+    receiver_close.start()
+
+
+    send_close.join()
+    receiver_close.join()
+
 
 def RDT_send(sender_sock: RDTSocket, source_address, target_address, test_case):
     """
@@ -68,7 +79,7 @@ def RDT_send(sender_sock: RDTSocket, source_address, target_address, test_case):
     #############################################################################
     #############################################################################
     # An example to assign proxy server destination
-    sock.proxy_server_addr = ("10.16.52.94", 12234)
+    sock.proxy_server_addr = ("127.0.0.1", 12349)
     #############################################################################
     sock.bind(source_address)
     sock.connect(target_address)
@@ -110,7 +121,7 @@ def RDT_receive(reciever_sock: RDTSocket, source_address, test_case):
     #############################################################################
     #############################################################################
     # An example to assign proxy server destination
-    sock.proxy_server_addr = ("10.16.52.94", 12234)
+    sock.proxy_server_addr = ("127.0.0.1", 12344)
     #############################################################################
     sock.bind(source_address)
     server_sock = sock.accept()
@@ -154,7 +165,15 @@ def test_file_integrity(original_path, transmit_path):
             if not block1:
                 break
 
-    return True        
+    return True
+
+def close_send(send_sock: RDTSocket):
+    sock = send_sock
+    sock.close()
+
+def close_server(reciever_sock: RDTSocket):
+    sock = reciever_sock
+    sock.close_server()
         
 if __name__ == '__main__':
     test_case()
